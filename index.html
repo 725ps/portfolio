@@ -10,6 +10,14 @@
 <meta property="og:url" content="https://725ps.github.io/portfolio/">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary">
+<!-- Google Analytics 4 - Replace G-XXXXXXXXXX with your Measurement ID -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-VJYDZ8BKYK"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-VJYDZ8BKYK');
+</script>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -483,28 +491,36 @@ body{font-family:'Poppins',sans-serif;background:var(--bg);color:var(--text);-we
 <button class="back-top" id="backTop" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
 
 <script>
-// Collapsible D/H/I
+// === D/H/I TOGGLE ===
 function toggleDHI(el){
   const content=el.nextElementSibling;
   const chevron=el.querySelector('.dhi-chevron');
   const hint=el.querySelector('.dhi-hint');
+  const label=el.querySelector('.dhi-label').textContent;
+  const card=el.closest('.project-card,.tata-card');
+  const project=card?card.querySelector('.project-name,.tata-name')?.textContent:'unknown';
   if(content.classList.contains('collapsed')){
     content.classList.remove('collapsed');content.classList.add('expanded');
     chevron.classList.add('open');
     if(hint)hint.textContent='(tap to collapse)';
+    // Analytics: track section expansion
+    if(typeof gtag!=='undefined')gtag('event','dhi_expand',{section:label,project:project});
   }else{
     content.classList.remove('expanded');content.classList.add('collapsed');
     chevron.classList.remove('open');
     if(hint)hint.textContent='(tap to expand)';
   }
 }
-// Scroll reveal
+
+// === SCROLL REVEAL ===
 const obs=new IntersectionObserver(e=>{e.forEach(el=>{if(el.isIntersecting){el.target.classList.add('visible');obs.unobserve(el.target)}})},{threshold:0.1});
 document.querySelectorAll('.reveal').forEach(el=>obs.observe(el));
-// Back to top
+
+// === BACK TO TOP ===
 const btn=document.getElementById('backTop');
 window.addEventListener('scroll',()=>{btn.classList.toggle('show',window.scrollY>600)});
-// Video fullscreen on tap
+
+// === VIDEO FULLSCREEN ===
 document.querySelectorAll('.project-video').forEach(container=>{
   const expandIcon=document.createElement('div');
   expandIcon.className='video-expand';
@@ -515,6 +531,112 @@ document.querySelectorAll('.project-video').forEach(container=>{
     if(video.requestFullscreen)video.requestFullscreen();
     else if(video.webkitEnterFullscreen)video.webkitEnterFullscreen();
   })}
+});
+
+// ============================================
+// ANALYTICS TRACKING (requires GA4 setup)
+// ============================================
+
+// 1. VIDEO PLAY TRACKING - which demo videos are watched
+document.querySelectorAll('video').forEach(v=>{
+  const name=v.src.split('/').pop().replace('.mp4','');
+  let tracked=false;
+  v.addEventListener('play',()=>{
+    if(!tracked&&typeof gtag!=='undefined'){
+      gtag('event','video_play',{video_name:name});
+      tracked=true;
+    }
+  });
+  // Track if they watch more than 50% of the video
+  v.addEventListener('timeupdate',()=>{
+    if(v.currentTime>v.duration*0.5&&!v.dataset.half){
+      v.dataset.half='true';
+      if(typeof gtag!=='undefined')gtag('event','video_50pct',{video_name:name});
+    }
+  });
+});
+
+// 2. PROJECT CARD VISIBILITY - which projects are actually seen
+const cardObs=new IntersectionObserver((entries)=>{
+  entries.forEach(e=>{
+    if(e.isIntersecting){
+      const name=e.target.querySelector('.project-name,.tata-name');
+      if(name&&typeof gtag!=='undefined'){
+        gtag('event','project_viewed',{project_name:name.textContent});
+      }
+      cardObs.unobserve(e.target);
+    }
+  });
+},{threshold:0.3});
+document.querySelectorAll('.project-card,.tata-card').forEach(c=>cardObs.observe(c));
+
+// 3. SCROLL DEPTH TRACKING - how far down the page they scroll
+let maxScroll=0;
+const scrollMilestones=[25,50,75,100];
+const trackedMilestones=new Set();
+window.addEventListener('scroll',()=>{
+  const pct=Math.round((window.scrollY/(document.body.scrollHeight-window.innerHeight))*100);
+  if(pct>maxScroll)maxScroll=pct;
+  scrollMilestones.forEach(m=>{
+    if(pct>=m&&!trackedMilestones.has(m)){
+      trackedMilestones.add(m);
+      if(typeof gtag!=='undefined')gtag('event','scroll_depth',{depth_percent:m});
+    }
+  });
+});
+
+// 4. SECTION VISIBILITY - when they reach AG section, Tata section, Footer
+['projects','tata','contact'].forEach(id=>{
+  const el=document.getElementById(id);
+  if(!el)return;
+  const sObs=new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{
+      if(e.isIntersecting){
+        if(typeof gtag!=='undefined')gtag('event','section_reached',{section_id:id});
+        sObs.unobserve(e.target);
+      }
+    });
+  },{threshold:0.1});
+  sObs.observe(el);
+});
+
+// 5. LINK CLICK TRACKING - patent links, contact links, portfolio footer
+document.querySelectorAll('.patent-link, .footer-item a, .footer-contact-item a').forEach(link=>{
+  link.addEventListener('click',()=>{
+    if(typeof gtag!=='undefined')gtag('event','link_click',{
+      link_text:link.textContent.trim().substring(0,50),
+      link_url:link.href||'',
+    });
+  });
+});
+
+// 6. CTA CLICK TRACKING - Get in Touch, Explore buttons
+document.querySelectorAll('.hero-cta, .hero-scroll').forEach(cta=>{
+  cta.addEventListener('click',()=>{
+    if(typeof gtag!=='undefined')gtag('event','cta_click',{cta_text:cta.textContent.trim()});
+  });
+});
+
+// 7. VIDEO FULLSCREEN TRACKING
+document.querySelectorAll('video').forEach(v=>{
+  v.addEventListener('fullscreenchange',()=>{
+    if(document.fullscreenElement===v){
+      const name=v.src.split('/').pop().replace('.mp4','');
+      if(typeof gtag!=='undefined')gtag('event','video_fullscreen',{video_name:name});
+    }
+  });
+});
+
+// 8. TIME ON PAGE - fires when user leaves
+let startTime=Date.now();
+window.addEventListener('beforeunload',()=>{
+  const seconds=Math.round((Date.now()-startTime)/1000);
+  if(typeof gtag!=='undefined')gtag('event','time_on_page',{seconds:seconds,max_scroll:maxScroll});
+});
+
+// 9. BACK TO TOP CLICK
+document.getElementById('backTop')?.addEventListener('click',()=>{
+  if(typeof gtag!=='undefined')gtag('event','back_to_top_click');
 });
 </script>
 </body>
